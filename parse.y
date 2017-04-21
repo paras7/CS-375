@@ -86,256 +86,143 @@ TOKEN parseresult;
 
 
 %%
-/* Notes
-    - idlist, vblock, varspecs, vargroup, type, simpletype, block taken from slide 129 of class notes
-    - all other rules derived from Pascal grammar flowcharts (https://www.cs.utexas.edu/users/novak/grammar.html)
-    - "$$ = $1" is implicit if no action specified according to yacc specs, but is explicit here for clarity
-  */
+/* I have split couple things into multiple statements so it is easier to keep track of
+and so that it makes more sense.*/
+//Had to change a lot of the grammar because it kept giving me, "ppexpr called with bad 
+//pointer 0" but not anymore with the changes implemented
 
-  program     : 
-          PROGRAM IDENTIFIER LPAREN idlist RPAREN SEMICOLON lblock DOT
-                          { parseresult = makeprogram($2, $4, $7); }
+  program   : PROGRAM IDENTIFIER LPAREN idlist RPAREN SEMICOLON lblock DOT       { parseresult = makeprogram($2, $4, $7); }
             ;
-
-    statement : 
-            NUMBER COLON statement      { $$ = dolabel($1, $2, $3); }
-          | assignment            { $$ = $1; }
-
-          | IDENTIFIER LPAREN 
-            argslist RPAREN         { $$ = makefuncall($2, $1, $3); }
-
-            | BEGINBEGIN statement endpart    { $$ = makepnb($1, cons($2, $3)); }
-            | IF expr THEN statement endif    { $$ = makeif($1, $2, $4, $5); }
-            | WHILE expr DO statement     { $$ = makewhile($1, $2, $3, $4); }
-            | REPEAT stmtlist UNTIL expr    { $$ = makerepeat($1, $2, $3, $4); }
-
-            | FOR assignment TO expr 
-              DO statement          { $$ = makefor(1, $1, $2, $3, $4, $5, $6); }
-
-            | FOR assignment DOWNTO 
-              expr DO statement       { $$ = makefor(-1, $1, $2, $3, $4, $5, $6); }
-
-            | GOTO NUMBER           { $$ = dogoto($1, $2); }
-            | /* empty */           { $$ = NULL; }
+  //All the lblocks work together to fully work
+  lblock    : LABEL lblock5 SEMICOLON lblock2   { $$ = $4; }
+            | lblock2                           { $$ = $1; }
             ;
-
-  stmtlist  : 
-          statement SEMICOLON stmtlist    { $$ = cons($1, $3); }
-        | statement             { $$ = $1; }
-        ;
-
-  idlist    : 
-          IDENTIFIER COMMA idlist     { $$ = cons($1, $3); }
-        | IDENTIFIER            { $$ = cons($1, NULL); }
-        ;
-
-  argslist  : 
-          expr COMMA argslist       { $$ = cons($1, $3); }
-        | expr                { $$ = cons($1, NULL); }
-        ;
-
-  lblock    : 
-          LABEL llist SEMICOLON cblock    { $$ = $4; } // lblock -> cblock -> tblock -> vblock -> block
-        | cblock              { $$ = $1; }
-        ;
-
-  cblock    : 
-          CONST clist tblock        { $$ = $3; }
-        | tblock              { $$ = $1; }
-        ;
-
-  tblock    : 
-          TYPE tspecs vblock        { $$ = $3; }
-        | vblock              { $$ = $1; }
-        ;
-
-  vblock    : 
-          VAR varspecs block        { $$ = $3; }
-        | block               { $$ = $1; }
-        ;
-  
-  block   : 
-          PROCEDURE IDENTIFIER paramlist 
-          SEMICOLON block SEMICOLON   { $$ = $1; }
-
-        | FUNCTION IDENTIFIER paramlist 
-          COLON IDENTIFIER SEMICOLON 
-          block SEMICOLON         { $$ = $1; }
-
-        | BEGINBEGIN statement endpart    { $$ = makepnb($1, cons($2, $3)); }
-        ;
-
-  paramlist : 
-          LPAREN paramgroup         { $$ = $1; }
-        | /* empty */           { $$ = NULL; }
-        ;
-
-  paramgroup  : 
-          idlist COLON IDENTIFIER RPAREN  { $$ = cons($1, $3); }
-
-        | idlist COLON IDENTIFIER 
-          SEMICOLON paramgroup      { $$ = cons($1, $3); }
-
-        | FUNCTION idlist COLON 
-          IDENTIFIER RPAREN       { $$ = cons($2, $4); }
-
-        | FUNCTION idlist COLON IDENTIFIER
-          SEMICOLON paramgroup      { $$ = cons($2, $4); }
-
-        | VAR idlist COLON 
-          IDENTIFIER RPAREN       { $$ = cons($2, $4); }
-
-        | VAR idlist COLON IDENTIFIER 
-          SEMICOLON paramgroup      { $$ = cons($2, $4); }
-
-        | PROCEDURE idlist RPAREN     { $$ = $2; }
-        | PROCEDURE idlist SEMICOLON 
-          paramgroup            { $$ = $2; }
-        ;
-
-  llist   : 
-          NUMBER COMMA llist        { instlabel($1); /* $$ = cons($1, $3); */ }
-        | NUMBER              { instlabel($1); }
-        ;
-
-  clist   : 
-          IDENTIFIER EQ NUMBER 
-          SEMICOLON clist         { instconst($1, $3); }
-
-        | IDENTIFIER EQ NUMBER SEMICOLON  { instconst($1, $3); }
-        ;
-
-  tspecs    : 
-          tgroup SEMICOLON tspecs     { $$ = $3; }
-        | tgroup SEMICOLON          { $$ = $1; }
-        ; 
-
-  tgroup    : 
-          IDENTIFIER EQ type        { insttype($1, $3); }
-        ;
-
-  varspecs  : 
-          vargroup SEMICOLON varspecs   { $$ = $3; }
-        | vargroup SEMICOLON        { $$ = $1; }
-        ;
-
-  vargroup  : 
-          idlist COLON type         { instvars($1, $3); }
-        ;
-
-    endpart   : 
-            SEMICOLON statement endpart     { $$ = cons($2, $3); }
-            | END                             { $$ = NULL; }
+  lblock2   : CONST lblock6 lblock3             { $$ = $3; }
+            | lblock3                           { $$ = $1; }
             ;
-             
-    endif   : 
-            ELSE statement                  { $$ = $2; }
-            | /* empty */                     { $$ = NULL; }
+  lblock3   : TYPE lblock7 lblock4              { $$ = $3; }
+            | lblock4                           { $$ = $1; }
             ;
-
-    assignment  : 
-            factor ASSIGN expr            { $$ = binop($2, $1, $3); }
-          ;
-
-    var     : 
-            IDENTIFIER            { $$ = findid($1); }
-          | var DOT IDENTIFIER        { $$ = reducedot($1, $2, $3); }
-          | mergebracks
-          | var POINT             { $$ = dopoint($1, $2); }
-          ;
-
-    mergebracks :
-            IDENTIFIER mergelist        { $$ = arrayref($1, NULL, $2, NULL); }
-          ;
-
-    mergelist :
-            LBRACKET argslist RBRACKET    { $$ = $2; }
-
-          | LBRACKET argslist 
-            RBRACKET mergelist        { $$ = nconc($2, $4); }
-          ;
-
-  fieldlist : 
-          idlist COLON type         { instfields($1, $3); }
-
-        | idlist COLON type 
-          SEMICOLON fieldlist       { instfields($1, $3); $$ = nconc($1, $5); }
-        
-        | /* empty */           { $$ = NULL; }
-        ;
-        
-  type    : 
-          simpletype            { $$ = $1; }
-        | POINT IDENTIFIER          { $$ = instpoint($1, $2); }
-
-        | ARRAY LBRACKET simplelist 
-          RBRACKET OF type        { $$ = instarray($3, $6); }
-
-        | RECORD fieldlist END        { $$ = instrec($1, $2); }
-        ;
-
-  simpletype  : 
-          IDENTIFIER            { $$ = findtype($1); }
-        | LPAREN idlist RPAREN        { $$ = instenum($2); }
-        | NUMBER DOTDOT NUMBER        { $$ = instdotdot($1, $2, $3); }
-        ;
-
-  simplelist  : 
-          simpletype COMMA simplelist   { $$ = cons($3, $1); } // $$ = cons($1, $3);
-        | simpletype            { $$ = $1; }
-        ;
-         
-    expr    : 
-            simpexpr EQ simpexpr        { $$ = binop($2, $1, $3); }
-          | simpexpr LT simpexpr        { $$ = binop($2, $1, $3); }
-            | simpexpr GT simpexpr        { $$ = binop($2, $1, $3); }
-            | simpexpr NE simpexpr        { $$ = binop($2, $1, $3); }
-            | simpexpr LE simpexpr        { $$ = binop($2, $1, $3); }
-            | simpexpr GE simpexpr        { $$ = binop($2, $1, $3); }
-            | simpexpr IN simpexpr        { $$ = binop($2, $1, $3); }
-            | simpexpr              { $$ = $1; }
+  lblock4   : VAR matched block                 { $$ = $3; }
+            | block                             { $$ = $1; }
             ;
-
-  simpexpr  : 
-          unaryexpr PLUS term       { $$ = binop($2, $1, $3); }
-        | unaryexpr MINUS term        { $$ = binop($2, $1, $3); }
-        | unaryexpr OR term         { $$ = binop($2, $1, $3); }
-        | unaryexpr             { $$ = $1; }
-        ;
-
-  unaryexpr : 
-          PLUS term             { $$ = unaryop($1, $2); }
-        | MINUS term            { $$ = unaryop($1, $2); }
-        | term                { $$ = $1; }
-        ;
-    
-    term    : 
-            factor TIMES factor               { $$ = binop($2, $1, $3); }
-          | factor DIVIDE factor              { $$ = binop($2, $1, $3); }
-          | factor DIV factor               { $$ = binop($2, $1, $3); }
-          | factor MOD factor               { $$ = binop($2, $1, $3); }
-          | factor AND factor               { $$ = binop($2, $1, $3); }
-            | factor              { $$ = $1; }
+  lblock5   : NUMBER COMMA lblock5              { instlabel($1); }
+            | NUMBER                            { instlabel($1); }
             ;
-             
-    factor    : 
-            NUMBER              { $$ = $1; }
-          | var               { $$ = $1; }
-          | IDENTIFIER LPAREN argslist RPAREN { $$ = makefuncall($2, $1, $3); }
-          | LPAREN expr RPAREN              { $$ = $2; }
-          | NOT factor            { $$ = unaryop($1, $2); }
-            | LBRACKET factorlist RBRACKET    { $$ = $2; }
-            | STRING              { $$ = $1; }
-            | NIL               { $$ = $1; }
+  lblock6   : IDENTIFIER EQ NUMBER SEMICOLON lblock6                              { instconst($1, $3); }
+            | IDENTIFIER EQ NUMBER SEMICOLON    { instconst($1, $3); }
             ;
-
-  factorlist  :
-          expr                { $$ = $1; }
-        | expr DOTDOT expr          { $$ = instdotdot($1, $2, $3); }
-        | expr DOTDOT expr COMMA factorlist { $$ = instdotdot($1, $2, $3); }
-        | /* empty */           { $$ = NULL; }
-;
-
+  lblock7   : tgroup SEMICOLON lblock7          { $$ = $3; }
+            | tgroup SEMICOLON                  { $$ = $1; }
+            ;
+  //All the types work together to fully work
+  type      : type2                             { $$ = $1; }
+            | POINT IDENTIFIER                  { $$ = instpoint($1, $2); }
+            | ARRAY LBRACKET type4 RBRACKET OF type                               { $$ = instarray($3, $6); }
+            | RECORD type3 END                  { $$ = instrec($1, $2); }
+            ;
+  type2     : IDENTIFIER                        { $$ = findtype($1); }
+            | LPAREN idlist RPAREN              { $$ = instenum($2); }
+            | NUMBER DOTDOT NUMBER              { $$ = instdotdot($1, $2, $3); }
+            ;
+  type3     : idlist COLON type                 { instfields($1, $3); }
+            | idlist COLON type SEMICOLON type3 { instfields($1, $3); $$ = nconc($1, $5); }
+            | /* empty */                       { $$ = NULL; }
+            ;
+  type4     : type2 COMMA type4                 { $$ = cons($3, $1); }
+            | type2                             { $$ = $1; }
+            ;
+  type5     : idlist COLON type                 { instvars($1, $3); }
+            ;
+  matched   : type5 SEMICOLON matched           { $$ = $3; }
+            | type5 SEMICOLON                   { $$ = $1; }
+            ;
+  keepGoing : expr COMMA keepGoing              { $$ = cons($1, $3); }
+            | expr                              { $$ = cons($1, NULL); }
+            ;
+  endpart   : SEMICOLON statement endpart       { $$ = cons($2, $3); }
+            | END                               { $$ = NULL; }
+            ;
+  endif     : ELSE statement                    { $$ = $2; }
+            | /* empty */                       { $$ = NULL; }
+            ;
+assignment  : factor ASSIGN expr                { $$ = binop($2, $1, $3); }
+            ;
+  //All the vars work together to fully work
+  var       : IDENTIFIER                        { $$ = findid($1); }
+            | var DOT IDENTIFIER                { $$ = reducedot($1, $2, $3); }
+            | var2
+            | var POINT                         { $$ = dopoint($1, $2); }
+            ;
+  var2      : IDENTIFIER var3                   { $$ = arrayref($1, NULL, $2, NULL); }
+            ;
+  var3      : LBRACKET keepGoing RBRACKET       { $$ = $2; }
+            | LBRACKET keepGoing RBRACKET var3  { $$ = nconc($2, $4); }
+            ;
+  idlist    : IDENTIFIER COMMA idlist           { $$ = cons($1, $3); }
+            | IDENTIFIER                        { $$ = cons($1, NULL); }
+            ; 
+  tgroup    : IDENTIFIER EQ type                { insttype($1, $3); }
+            ;
+  //All the exprs work together to fully work
+  expr      : expr2 EQ expr2                    { $$ = binop($2, $1, $3); }
+            | expr2 LT expr2                    { $$ = binop($2, $1, $3); }
+            | expr2 GT expr2                    { $$ = binop($2, $1, $3); }
+            | expr2 NE expr2                    { $$ = binop($2, $1, $3); }
+            | expr2 LE expr2                    { $$ = binop($2, $1, $3); }
+            | expr2 GE expr2                    { $$ = binop($2, $1, $3); }
+            | expr2 IN expr2                    { $$ = binop($2, $1, $3); }
+            | expr2                             { $$ = $1; }
+            ;
+  expr2     : expr3 PLUS term                   { $$ = binop($2, $1, $3); }
+            | expr3 MINUS term                  { $$ = binop($2, $1, $3); }
+            | expr3 OR term                     { $$ = binop($2, $1, $3); }
+            | expr3                             { $$ = $1; }
+            ;
+  expr3     : PLUS term                         { $$ = unaryop($1, $2); }
+            | MINUS term                        { $$ = unaryop($1, $2); }
+            | term                              { $$ = $1; }
+            ;
+  term      : factor TIMES factor               { $$ = binop($2, $1, $3); }
+            | factor DIVIDE factor              { $$ = binop($2, $1, $3); }
+            | factor DIV factor                 { $$ = binop($2, $1, $3); }
+            | factor MOD factor                 { $$ = binop($2, $1, $3); }
+            | factor AND factor                 { $$ = binop($2, $1, $3); }
+            | factor                            { $$ = $1; }
+            ;
+  //All the factors work together to fully work
+  factor    : NUMBER                            { $$ = $1; }
+            | var                               { $$ = $1; }
+            | IDENTIFIER LPAREN keepGoing RPAREN{ $$ = makefuncall($2, $1, $3); }
+            | LPAREN expr RPAREN                { $$ = $2; }
+            | NOT factor                        { $$ = unaryop($1, $2); }
+            | LBRACKET factor2 RBRACKET         { $$ = $2; }
+            | STRING                            { $$ = $1; }
+            | NIL                               { $$ = $1; }
+            ;
+  factor2   : expr                              { $$ = $1; }
+            | expr DOTDOT expr                  { $$ = instdotdot($1, $2, $3); }
+            | expr DOTDOT expr COMMA factor2    { $$ = instdotdot($1, $2, $3); }
+            | /* empty */                       { $$ = NULL; }
+            ;
+  //All the statements work together to fully work
+  statement : NUMBER COLON statement            { $$ = dolabel($1, $2, $3); }
+            | assignment                        { $$ = $1; }
+            | IDENTIFIER LPAREN keepGoing RPAREN{ $$ = makefuncall($2, $1, $3); }
+            | BEGINBEGIN statement endpart      { $$ = makepnb($1, cons($2, $3)); }
+            | IF expr THEN statement endif      { $$ = makeif($1, $2, $4, $5); }
+            | WHILE expr DO statement           { $$ = makewhile($1, $2, $3, $4); }
+            | REPEAT statement2 UNTIL expr      { $$ = makerepeat($1, $2, $3, $4); }
+            | FOR assignment TO expr DO statement          { $$ = makefor(1, $1, $2, $3, $4, $5, $6); }
+            | FOR assignment DOWNTO expr DO statement      { $$ = makefor(-1, $1, $2, $3, $4, $5, $6); }
+            | GOTO NUMBER                       { $$ = dogoto($1, $2); }
+            | /* empty */                       { $$ = NULL; }
+            ;
+  statement2: statement SEMICOLON statement2    { $$ = cons($1, $3); }
+            | statement                         { $$ = $1; }
+            ;
+  block     :  BEGINBEGIN statement endpart     { $$ = makepnb($1, cons($2, $3)); }
+            ; 
 %%
 
 /* You should add your own debugging flags below, and add debugging
