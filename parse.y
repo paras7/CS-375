@@ -59,7 +59,7 @@
 #include <float.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include <limits.h> //for INT_MIN
+#include <limits.h> //for INT_MIN/MAX
 
         /* define the type of the Yacc stack element to be TOKEN */
 
@@ -91,7 +91,7 @@ and so that it makes more sense.*/
 //Had to change a lot of the grammar because it kept giving me, "ppexpr called with bad 
 //pointer 0" but not anymore with the changes implemented
 
-  program   : PROGRAM IDENTIFIER LPAREN idlist RPAREN SEMICOLON lblock DOT       { parseresult = makeprogram($2, $4, $7); }
+  program   : PROGRAM IDENTIFIER LPAREN idlist RPAREN SEMICOLON lblock DOT        { parseresult = makeprogram($2, $4, $7); }
             ;
   //All the lblocks work together to fully work
   lblock    : LABEL lblock5 SEMICOLON lblock2   { $$ = $4; }
@@ -112,8 +112,10 @@ and so that it makes more sense.*/
   lblock6   : IDENTIFIER EQ NUMBER SEMICOLON lblock6                              { instconst($1, $3); }
             | IDENTIFIER EQ NUMBER SEMICOLON    { instconst($1, $3); }
             ;
-  lblock7   : tgroup SEMICOLON lblock7          { $$ = $3; }
-            | tgroup SEMICOLON                  { $$ = $1; }
+  lblock7   : lblock8 SEMICOLON lblock7         { $$ = $3; }
+            | lblock8 SEMICOLON                 { $$ = $1; }
+            ;
+  lblock8   : IDENTIFIER EQ type                { insttype($1, $3); }
             ;
   //All the types work together to fully work
   type      : type2                             { $$ = $1; }
@@ -158,11 +160,6 @@ assignment  : factor ASSIGN expr                { $$ = binop($2, $1, $3); }
             ;
   var3      : LBRACKET keepGoing RBRACKET       { $$ = $2; }
             | LBRACKET keepGoing RBRACKET var3  { $$ = nconc($2, $4); }
-            ;
-  idlist    : IDENTIFIER COMMA idlist           { $$ = cons($1, $3); }
-            | IDENTIFIER                        { $$ = cons($1, NULL); }
-            ; 
-  tgroup    : IDENTIFIER EQ type                { insttype($1, $3); }
             ;
   //All the exprs work together to fully work
   expr      : expr2 EQ expr2                    { $$ = binop($2, $1, $3); }
@@ -220,6 +217,9 @@ assignment  : factor ASSIGN expr                { $$ = binop($2, $1, $3); }
             ;
   statement2: statement SEMICOLON statement2    { $$ = cons($1, $3); }
             | statement                         { $$ = $1; }
+            ;
+  idlist    : IDENTIFIER COMMA idlist           { $$ = cons($1, $3); }
+            | IDENTIFIER                        { $$ = cons($1, NULL); }
             ;
   block     :  BEGINBEGIN statement endpart     { $$ = makepnb($1, cons($2, $3)); }
             ; 
