@@ -1052,7 +1052,7 @@ TOKEN addint(TOKEN exp, TOKEN off, TOKEN tok) {
 
 //GIVING ME PROBLEMS!!!!!
 void instlabel (TOKEN num) {
-  arrForLabel[labelnumber++] == num->intval;
+  arrForLabel[labelnumber++] = num->intval;
 }
 
 TOKEN dogoto(TOKEN tok, TOKEN labeltok) {
